@@ -1,0 +1,176 @@
+---
+title: "Statistical inference with the GSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+```
+
+### Load data
+```{r load-data}
+load("gss.Rdata")
+```
+* * *
+
+## Part 1: Data
+The data provided for this analysis will be from the General Social Survey (GSS), which has been monitoring and studying how people in the United States feel about particular issues. These issues include abortion, drug usage, government aid, etc.
+
+This analysis will go under the following assumptions:
+
+1. The sample is random.
+2. Each participate of the survey is independent of the other participants.
+
+Hence, this dataset and analysis can be applied to the entire population of the United States. However, this analysis is merely an observational experiment for there are no random assignments and therefore cannot conclude casuality of any kind.
+
+* * *
+
+## Part 2: Research question
+
+My investigation will explore the relationship between age and political identity. Obviously as one grows older, we can assume that one gains new experiences and perspective. However, is there a relationship between one's age and their political identity? Do younger people identify more with one side of the political spectrum than those much older? 
+
+This investigation hopes to shed some insight into the current political climate and perhaps answer a few questions regarding the political divide in the United States.
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+First, let's organize the data by political identification. We will use the following variables:
+
+1. ```age```: The age of the respondant
+2. ```polviews```: The political identification that the respondant self-identifies as
+```{r}
+political_group <- gss %>%
+  select(age, polviews) %>%
+  filter(!is.na(age), !is.na(polviews))
+
+political_group %>%
+  group_by(polviews) %>%
+  summarise(total = n(), percentage = total / nrow(political_group) * 100)
+
+ggplot(political_group, aes(x = polviews, fill = polviews)) + geom_bar() + coord_flip()
+```
+<br>
+From the chart and table above, the data shows among all ages and relative to the other political identities, those that identify as "Moderate" are about 38.61%, which is the most of any other political identity.
+<br>
+Now let's look at what happens when we look at the data when we incorporate age. 
+First, let's look at the age range of the survey.
+```{r}
+age_survey <- political_group %>%
+  summarise(min_age = min(political_group$age), max_age = max(political_group$age))
+
+age_survey
+```
+<br>
+So the range of age is from the age 18 to 89 years. 
+Let's look back at the political identity chart but this time with ```age``` incorporated.
+```{r}
+ggplot(political_group, aes(x = age, fill = polviews)) + geom_bar()
+```
+<br>
+There are several things to notice here:
+
+* Moderates appear to the be majority in every age group.
+* Extremes (extremely liberal / extremely conservative) are minorities in every age group.
+* It appears that as ```age``` increases, those that identify as conservatives (extremely conservative, conservative, slightly conservative) seem to outnumber those that identify as liberal (extremely liberal, liberal, slightly liberal).
+
+Let's investigate further if the third point is the case.
+```{r}
+lib_vs_con <- political_group %>%
+  filter(age > 60, polviews != "Moderate")
+
+# grouped the liberals (slight liberal, liberal, extremely liberal) into one group: Liberal
+# grouped the conservatives (slight conservative, conservative, extremely conservative) into one group: Conservative
+
+levels(lib_vs_con$polviews) <- c("Liberal", "Liberal", "Liberal", "Moderate", "Conservative", "Conservative", "Conservative")
+
+lib_vs_con %>%
+  group_by(polviews) %>%
+  summarise(total = n())
+
+ggplot(lib_vs_con, aes(x = age, fill = polviews)) + geom_bar()
+
+```
+<br>
+I selected 60 years old as an arbitrary age to investigate. However, it is evident that older people identify themselves more as conservatives than liberals. Let's look back at our chart of the whole age range but doing what we did in the above chart with grouping the liberals together and the conservatives. We will include the moderates as well.
+```{r}
+levels(political_group$polviews) <- c("Liberal", "Liberal", "Liberal", "Moderate", "Conservative", "Conservative", "Conservative")
+
+ggplot(political_group, aes(x = age, fill = polviews)) + geom_bar()
+```
+<br>
+From the chart, it is easier to read now that the data as been divided only into three levels: ***Liberal***, ***Moderate***, and ***Conservative***.
+<br>
+To see if there's a division among age groups of political identity. Let's see which age groups are more liberal than conservative and vice versa.
+```{r}
+ggplot(political_group, aes(x = age, fill = polviews)) + geom_bar(position = position_dodge())
+```
+<br>
+Although this chart looks a bit difficult to read, it allows us to see a bit of each age group and how many identifies themselves as ***Liberals***, ***Moderate***, and ***Conservatives***. It appears that as ```age``` gets larger than about 32, more people older than 32 seem to identify themselves as conservatives.
+
+```{r}
+more_liberals <- political_group %>%
+  filter(age < 32, polviews != "Moderate")
+
+ggplot(more_liberals, aes(x = age, fill = polviews)) + geom_bar(position = position_dodge())
+
+more_conservatives <- political_group %>%
+  filter(age >= 32, polviews != "Moderate")
+
+ggplot(more_conservatives, aes(x = age, fill = polviews)) + geom_bar(position = position_dodge())
+```
+<br>
+Aside from the group 28 year olds that are more identified as ***Conservatives*** than ***Liberals***, we see a trend in which people over the age of 31 identify themselves more as ***Conservatives*** than ***Liberals*** and the opposite is true for those less than or equal to 31 years old. 
+
+* * * 
+
+## Part 4: Inference
+
+Now that we've seen a few interesting trends, let's investigate this question further: Is there a relationship between age and political identity? In other words, is one's political identity dependent of one's age?
+<br>
+We will conduct an inference using the given data to get some insight on this question. Here, we treat ```age``` as a ***categorical variable***. Since ```polviews``` is a categorical variable and we are testing to see if ```age``` and ```polviews``` are independent of each other, then we must use a ***Chi-Square Test of Independence***.
+
+**Note**: Since we are conducting a Chi-Square test, we will not concern ourselves with confidence intervals.
+
+First, we will establish out hypotheses:
+
+* Ho: ```age``` and ```polviews``` are independent of each other.
+* Ha: ```age``` and ```polviews``` are ***not*** independent of each other.
+
+**Note**: Since it seems that ***Moderates*** are the majority in almost every age group, we'll solely focus on ***Liberals*** and ***Conservatives***. Also we will be using a significance level of 0.05.
+```{r}
+# convert age from a numerical variable to a categorical variable
+political_group$age <- factor(political_group$age)
+
+# filter out the Moderates
+just_lib_con <- political_group %>%
+  filter(polviews != "Moderate")
+
+# will removes the Moderates since we won't be using them
+# this step is important for it will affect our Chi-Square test
+just_lib_con$polviews <- factor(just_lib_con$polviews)
+
+# this table is just an illustration
+# notice how Moderate is absent
+# now we only have 2 columns & 71 rows
+table(just_lib_con$age, just_lib_con$polviews)
+
+# our Chi-Square Test of Independence
+chisq.test(table(just_lib_con$age, just_lib_con$polviews))
+```
+<br>
+As we can see from the Chi-Square Test of Independence, the p-value of the test is less than 2.2e-16 which is much less than 0.05. Hence, according to the test, we can reject the null hypothesis in favor of the alternative hypothesis which states that ```age``` and ```polviews``` are ***not*** independent of each other.
+
+## Conclusion
+
+We investigated the relationship between one's age and one's political identity. Obviously this analysis is ***not*** definitive nor conclusive in asserting that age indicates one's political views. However, this does shed light into the generational divide among Americans in regards to politics. Perhaps there are other factors to investigate such as location for some states are often associated with a political identity in contrast to another state. Regardless, we have seen that age and political views are not entirely independent of each other and that could affirm conventional notion that older people might have more of a tendency to stick to traditional beliefs while a younger generation are learning / developing new beliefs.
